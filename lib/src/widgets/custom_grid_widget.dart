@@ -189,12 +189,14 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     
     // Apply search
     if (_searchTerm != null && _searchTerm!.isNotEmpty) {
+      final searchTermLower = _searchTerm!.toLowerCase().trim();
       _filteredRows = _filteredRows.where((row) {
         return widget.columns.any((column) {
           if (!column.searchable) return false;
           final value = row.getValue(column.id);
           if (value == null) return false;
-          return value.toString().toLowerCase().contains(_searchTerm!.toLowerCase());
+          final valueStr = value.toString().toLowerCase();
+          return valueStr.contains(searchTermLower);
         });
       }).toList();
     }
@@ -202,35 +204,57 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     // Apply filters
     for (final entry in _filters.entries) {
       if (entry.value.isNotEmpty) {
+        // Parse filter type from key: 'columnId|filterType'
+        final parts = entry.key.split('|');
+        final columnId = parts[0];
+        final filterType = parts.length > 1 ? parts[1] : 'contains';
+        final filterValue = entry.value.toLowerCase().trim();
         _filteredRows = _filteredRows.where((row) {
-          final column = widget.columns.firstWhere((col) => col.id == entry.key);
-          if (!column.filterable) return true;
-          final value = row.getValue(column.id);
-          if (value == null) return false;
-          if (column.filterFunction != null) {
-            return column.filterFunction!(value, entry.value);
+          try {
+            final column = widget.columns.firstWhere((col) => col.id == columnId);
+            if (!column.filterable) return true;
+            final value = row.getValue(column.id);
+            if (value == null) return false;
+            final valueStr = value.toString().toLowerCase();
+            switch (filterType) {
+              case 'exact':
+                return valueStr == filterValue;
+              case 'startsWith':
+                return valueStr.startsWith(filterValue);
+              case 'endsWith':
+                return valueStr.endsWith(filterValue);
+              case 'contains':
+              default:
+                return valueStr.contains(filterValue);
+            }
+          } catch (e) {
+            // If column not found, skip this filter
+            return true;
           }
-          return value.toString().toLowerCase().contains(entry.value.toLowerCase());
         }).toList();
       }
     }
     
     // Apply sorting
     if (_sortColumn != null) {
-      final column = widget.columns.firstWhere((col) => col.id == _sortColumn);
-      if (column.sortable) {
-        _filteredRows.sort((a, b) {
-          final aValue = a.getValue(column.id);
-          final bValue = b.getValue(column.id);
-          if (column.sortFunction != null) {
-            return column.sortFunction!(aValue, bValue) * (_sortAscending == true ? 1 : -1);
-          }
-          if (aValue == null && bValue == null) return 0;
-          if (aValue == null) return _sortAscending == true ? -1 : 1;
-          if (bValue == null) return _sortAscending == true ? 1 : -1;
-          final comparison = aValue.toString().compareTo(bValue.toString());
-          return comparison * (_sortAscending == true ? 1 : -1);
-        });
+      try {
+        final column = widget.columns.firstWhere((col) => col.id == _sortColumn);
+        if (column.sortable) {
+          _filteredRows.sort((a, b) {
+            final aValue = a.getValue(column.id);
+            final bValue = b.getValue(column.id);
+            if (column.sortFunction != null) {
+              return column.sortFunction!(aValue, bValue) * (_sortAscending == true ? 1 : -1);
+            }
+            if (aValue == null && bValue == null) return 0;
+            if (aValue == null) return _sortAscending == true ? -1 : 1;
+            if (bValue == null) return _sortAscending == true ? 1 : -1;
+            final comparison = aValue.toString().compareTo(bValue.toString());
+            return comparison * (_sortAscending == true ? 1 : -1);
+          });
+        }
+      } catch (e) {
+        // If column not found, skip sorting
       }
     }
     
@@ -244,25 +268,36 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
   }
 
   void _onSearch(String searchTerm) {
-    setState(() {
-      _searchTerm = searchTerm;
-      _currentPage = 1;
-    });
-    _updateFilteredRows();
-    widget.actions.onSearch?.call(searchTerm);
+    final newSearchTerm = searchTerm.isEmpty ? null : searchTerm;
+    
+    // Only update if the search term actually changed
+    if (_searchTerm != newSearchTerm) {
+      setState(() {
+        _searchTerm = newSearchTerm;
+        _currentPage = 1;
+      });
+      _updateFilteredRows();
+      widget.actions.onSearch?.call(searchTerm);
+    }
   }
 
   void _onFilter(String columnId, String filterValue) {
-    setState(() {
-      if (filterValue.isEmpty) {
-        _filters.remove(columnId);
-      } else {
-        _filters[columnId] = filterValue;
-      }
-      _currentPage = 1;
-    });
-    _updateFilteredRows();
-    widget.actions.onFilter?.call(columnId, filterValue);
+    final newFilterValue = filterValue.isEmpty ? null : filterValue;
+    final currentFilter = _filters[columnId];
+    
+    // Only update if the filter value actually changed
+    if (currentFilter != newFilterValue) {
+      setState(() {
+        if (newFilterValue == null) {
+          _filters.remove(columnId);
+        } else {
+          _filters[columnId] = newFilterValue;
+        }
+        _currentPage = 1;
+      });
+      _updateFilteredRows();
+      widget.actions.onFilter?.call(columnId, filterValue);
+    }
   }
 
   void _onSort(String columnId, bool ascending) {
@@ -351,20 +386,31 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     final isTablet = screenWidth >= widget.config.mobileBreakpoint && screenWidth < widget.config.tabletBreakpoint;
     
     if (isMobile) {
-      // On mobile, use flexible widths with minimum constraints
-      return column.width ?? (availableWidth / widget.columns.length).clamp(
-        widget.config.mobileMinColumnWidth, 
-        widget.config.mobileMaxColumnWidth
-      );
+      // On mobile, use fixed minimum widths to ensure horizontal scrolling
+      // If column has a specific width, use it; otherwise use minimum width
+      return column.width ?? widget.config.mobileMinColumnWidth;
     } else if (isTablet) {
-      // On tablet, use medium widths
-      return column.width ?? (availableWidth / widget.columns.length).clamp(
+      // On tablet, use specified width or calculate based on available space
+      if (column.width != null) {
+        return column.width!;
+      }
+      // Calculate proportional width based on available space
+      final totalColumns = widget.columns.where((col) => col.visible).length;
+      return (availableWidth / totalColumns).clamp(
         widget.config.tabletMinColumnWidth, 
         widget.config.tabletMaxColumnWidth
       );
     } else {
-      // On desktop, use specified width or default
-      return column.width ?? widget.config.desktopDefaultColumnWidth;
+      // On desktop, use specified width or calculate proportional width
+      if (column.width != null) {
+        return column.width!;
+      }
+      // Calculate proportional width based on available space
+      final totalColumns = widget.columns.where((col) => col.visible).length;
+      return (availableWidth / totalColumns).clamp(
+        widget.config.desktopDefaultColumnWidth * 0.8, 
+        widget.config.desktopDefaultColumnWidth * 1.5
+      );
     }
   }
 
@@ -392,9 +438,19 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
 
   /// Check if horizontal scrolling is needed
   bool _needsHorizontalScroll(double availableWidth) {
-    if (!widget.config.shouldEnableHorizontalScroll(MediaQuery.of(context).size.width)) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < widget.config.mobileBreakpoint;
+    
+    // Always enable horizontal scrolling on mobile for better UX
+    if (isMobile) {
+      return true;
+    }
+    
+    // For tablet and desktop, check if horizontal scrolling should be enabled
+    if (!widget.config.shouldEnableHorizontalScroll(screenWidth)) {
       return false;
     }
+    
     final totalWidth = _calculateTotalColumnWidth(availableWidth);
     return totalWidth > availableWidth;
   }
@@ -415,6 +471,20 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
   bool _shouldShowHeaders() {
     final screenWidth = MediaQuery.of(context).size.width;
     return widget.config.shouldShowHeaders(screenWidth);
+  }
+
+  /// Get column width for layout (used in header and row building)
+  double _getColumnWidthForLayout(GridColumn column, double availableWidth) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < widget.config.mobileBreakpoint;
+    
+    if (isMobile) {
+      // On mobile, use fixed widths for consistent layout
+      return column.width ?? widget.config.mobileMinColumnWidth;
+    } else {
+      // On tablet and desktop, use responsive calculation
+      return _getResponsiveColumnWidth(column, availableWidth);
+    }
   }
 
   @override
@@ -498,7 +568,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
 
   Widget _buildHeader(double availableWidth, double totalWidth, bool needsHorizontalScroll) {
     return Container(
-      height: _getResponsiveHeaderHeight(),
+      height: widget.config.headerHeight,
       decoration: BoxDecoration(
         color: widget.config.headerBackgroundColor,
         border: Border(
@@ -508,16 +578,27 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
           ),
         ),
       ),
-      child: needsHorizontalScroll
-          ? SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              controller: _horizontalScrollController,
-              child: SizedBox(
-                width: totalWidth,
-                child: _buildHeaderRow(availableWidth),
+      child: Row(
+        children: [
+          if (widget.config.showSelection) ...[
+            SizedBox(
+              width: 60,
+              child: Center(child: Checkbox(value: false, onChanged: null)),
+            ),
+          ],
+          ...widget.columns.where((col) => col.visible).map((column) {
+            return Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _buildHeaderCell(column),
               ),
-            )
-          : _buildHeaderRow(availableWidth),
+            );
+          }),
+          if (widget.config.showActions) ...[
+            SizedBox(width: 80),
+          ],
+        ],
+      ),
     );
   }
 
@@ -547,7 +628,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
         ],
         ...widget.columns.where((col) => col.visible).map((column) {
           return SizedBox(
-            width: _getResponsiveColumnWidth(column, availableWidth),
+            width: _getColumnWidthForLayout(column, availableWidth),
             child: _buildHeaderCell(column),
           );
         }),
@@ -674,9 +755,11 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                 ),
               ],
               ...widget.columns.where((col) => col.visible).map((column) {
-                return SizedBox(
-                  width: _getResponsiveColumnWidth(column, availableWidth),
-                  child: _buildCell(row, column, index),
+                return Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildCell(row, column, index),
+                  ),
                 );
               }),
               if (widget.config.showActions && row.actions != null) ...[
@@ -700,10 +783,9 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
 
   Widget _buildCell(GridRow row, GridColumn column, int index) {
     final value = row.getValue(column.id);
-    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      alignment: column.alignment,
+      alignment: Alignment.centerLeft,
       child: column.cellBuilder?.call(context, value, index) ??
           Text(
             value?.toString() ?? '',
@@ -713,7 +795,8 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                   : widget.config.rowTextColor,
             ),
             overflow: TextOverflow.ellipsis,
-            maxLines: 2, // Allow 2 lines for better mobile experience
+            maxLines: 2,
+            textAlign: TextAlign.left,
           ),
     );
   }
