@@ -9,10 +9,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Dexef Grid Example',
+      title: 'Advanced Dexef Grid Example',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
+        useMaterial3: true,
       ),
       home: MyGridPage(),
     );
@@ -47,14 +49,15 @@ class _MyGridPageState extends State<MyGridPage> {
   }
 
   void _initializeData() {
-    // Define columns with responsive configuration
+    // Define columns with advanced features
     columns = [
       GridColumn(
         id: 'id',
         title: 'ID',
         sortable: true,
         searchable: true,
-        width: 100.0, // Fixed width for ID column
+        filterable: true,
+        width: 80.0,
         alignment: Alignment.center,
         cellBuilder: (context, value, index) {
           return Container(
@@ -68,6 +71,7 @@ class _MyGridPageState extends State<MyGridPage> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.blue.shade800,
+                fontSize: 12,
               ),
             ),
           );
@@ -78,7 +82,8 @@ class _MyGridPageState extends State<MyGridPage> {
         title: 'Full Name',
         sortable: true,
         searchable: true,
-        width: null, // Will use responsive width calculation
+        filterable: true,
+        width: null,
         cellBuilder: (context, value, index) {
           return Row(
             children: [
@@ -90,6 +95,7 @@ class _MyGridPageState extends State<MyGridPage> {
                   style: TextStyle(
                     color: Colors.blue.shade800,
                     fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -110,7 +116,8 @@ class _MyGridPageState extends State<MyGridPage> {
         title: 'Email Address',
         sortable: true,
         searchable: true,
-        width: null, // Will use responsive width calculation
+        filterable: true,
+        width: null,
         cellBuilder: (context, value, index) {
           return Row(
             children: [
@@ -132,7 +139,8 @@ class _MyGridPageState extends State<MyGridPage> {
         title: 'Status',
         sortable: true,
         filterable: true,
-        width: 140.0, // Fixed width for status column
+        searchable: true,
+        width: 120.0,
         cellBuilder: (context, value, index) {
           final isActive = value == 'Active';
           return Container(
@@ -172,7 +180,8 @@ class _MyGridPageState extends State<MyGridPage> {
         title: 'Role',
         sortable: true,
         filterable: true,
-        width: 160.0, // Fixed width for role column
+        searchable: true,
+        width: 140.0,
         cellBuilder: (context, value, index) {
           final roleColors = {
             'Admin': Colors.purple,
@@ -180,6 +189,8 @@ class _MyGridPageState extends State<MyGridPage> {
             'Developer': Colors.blue,
             'Designer': Colors.pink,
             'Tester': Colors.teal,
+            'Analyst': Colors.indigo,
+            'Support': Colors.amber,
           };
           final color = roleColors[value] ?? Colors.grey;
           
@@ -201,10 +212,36 @@ class _MyGridPageState extends State<MyGridPage> {
         },
       ),
       GridColumn(
+        id: 'department',
+        title: 'Department',
+        sortable: true,
+        filterable: true,
+        searchable: true,
+        width: 140.0,
+        cellBuilder: (context, value, index) {
+          return Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              value.toString(),
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          );
+        },
+      ),
+      GridColumn(
         id: 'lastLogin',
         title: 'Last Login',
         sortable: true,
-        width: null, // Will use responsive width calculation
+        filterable: true,
+        width: null,
         cellBuilder: (context, value, index) {
           return Row(
             children: [
@@ -224,9 +261,36 @@ class _MyGridPageState extends State<MyGridPage> {
           );
         },
       ),
+      GridColumn(
+        id: 'salary',
+        title: 'Salary',
+        sortable: true,
+        filterable: true,
+        width: 120.0,
+        cellBuilder: (context, value, index) {
+          final salary = double.tryParse(value.toString()) ?? 0.0;
+          final isHighSalary = salary > 80000;
+          
+          return Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isHighSalary ? Colors.green.shade100 : Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '\$${salary.toStringAsFixed(0)}',
+              style: TextStyle(
+                color: isHighSalary ? Colors.green.shade700 : Colors.orange.shade700,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          );
+        },
+      ),
     ];
 
-    // Generate sample data
+    // Generate sample data with more variety
     rows = _generateSampleData();
 
     // Configure actions
@@ -243,6 +307,12 @@ class _MyGridPageState extends State<MyGridPage> {
       },
       onMultiRowSelected: (rowIds, rowData) {
         print('Multiple rows selected: $rowIds');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${rowIds.length} rows selected'),
+            duration: Duration(seconds: 2),
+          ),
+        );
       },
       onSearch: (term) {
         setState(() {
@@ -297,9 +367,9 @@ class _MyGridPageState extends State<MyGridPage> {
       },
     );
 
-    // Configure responsive settings
+    // Configure advanced responsive settings
     config = GridConfig(
-      // Visual styling
+      // Visual styling with modern design
       backgroundColor: Colors.white,
       headerBackgroundColor: Colors.grey.shade50,
       rowBackgroundColor: Colors.white,
@@ -310,31 +380,31 @@ class _MyGridPageState extends State<MyGridPage> {
       selectedRowTextColor: Colors.blue.shade800,
       borderColor: Colors.grey.shade200,
       rowBorderColor: Colors.grey.shade100,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       shadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 4,
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 8,
           offset: Offset(0, 2),
         ),
       ],
       
-      // Responsive configuration - Mobile optimized
-      mobileMinColumnWidth: 120.0, // Increased minimum width
+      // Responsive configuration - Enhanced for all devices
+      mobileMinColumnWidth: 100.0,
       mobileMaxColumnWidth: 200.0,
       mobileRowHeight: 70.0,
       mobileHeaderHeight: 60.0,
       showMobileHeaders: true,
-      enableMobileHorizontalScroll: true, // Always enabled
+      enableMobileHorizontalScroll: true,
       
-      tabletMinColumnWidth: 140.0, // Increased for better tablet layout
-      tabletMaxColumnWidth: 400.0, // Increased max width
+      tabletMinColumnWidth: 120.0,
+      tabletMaxColumnWidth: 300.0,
       tabletRowHeight: 60.0,
       tabletHeaderHeight: 55.0,
       showTabletHeaders: true,
       enableTabletHorizontalScroll: true,
       
-      desktopDefaultColumnWidth: 250.0, // Increased default width
+      desktopDefaultColumnWidth: 200.0,
       desktopRowHeight: 55.0,
       desktopHeaderHeight: 50.0,
       showDesktopHeaders: true,
@@ -344,48 +414,49 @@ class _MyGridPageState extends State<MyGridPage> {
       mobileBreakpoint: 768.0,
       tabletBreakpoint: 1024.0,
       
-      // Other settings
+      // Advanced features
       showSelection: true,
       showSearch: true,
       showFilter: true,
       showPagination: true,
       showActions: true,
       allowMultiSelection: true,
+      allowSorting: true,
+      allowFiltering: true,
+      allowSearching: true,
       itemsPerPage: 10,
-      itemsPerPageOptions: [5, 10, 20, 50],
-      searchPlaceholder: 'Search users...',
+      itemsPerPageOptions: [5, 10, 20, 50, 100],
+      searchPlaceholder: 'Search users, emails, roles...',
+      emptyStateMessage: 'No users found matching your criteria',
+      loadingStateMessage: 'Loading users...',
+      errorStateMessage: 'Error loading users',
     );
   }
 
   List<GridRow> _generateSampleData() {
     final names = [
-      'John Doe',
-      'Jane Smith',
-      'Mike Johnson',
-      'Sarah Wilson',
-      'David Brown',
-      'Emily Davis',
-      'Robert Miller',
-      'Lisa Garcia',
-      'James Rodriguez',
-      'Maria Martinez',
-      'Christopher Lee',
-      'Jennifer Taylor',
-      'Daniel Anderson',
-      'Amanda Thomas',
-      'Matthew Jackson',
+      'John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson', 'David Brown',
+      'Emily Davis', 'Robert Miller', 'Lisa Garcia', 'James Rodriguez', 'Maria Martinez',
+      'Christopher Lee', 'Jennifer Taylor', 'Daniel Anderson', 'Amanda Thomas', 'Matthew Jackson',
+      'Jessica White', 'Andrew Harris', 'Nicole Clark', 'Kevin Lewis', 'Stephanie Walker',
+      'Brian Hall', 'Laura Allen', 'Steven Young', 'Michelle King', 'Timothy Wright',
+      'Ashley Lopez', 'Jason Hill', 'Rebecca Scott', 'Eric Green', 'Melissa Baker',
+      'Adam Adams', 'Kimberly Nelson', 'Ryan Carter', 'Heather Mitchell', 'Jonathan Perez',
     ];
 
-    final roles = ['Admin', 'Manager', 'Developer', 'Designer', 'Tester'];
-    final statuses = ['Active', 'Inactive'];
-    final domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+    final roles = ['Admin', 'Manager', 'Developer', 'Designer', 'Tester', 'Analyst', 'Support'];
+    final statuses = ['Active', 'Inactive', 'Pending'];
+    final departments = ['Engineering', 'Design', 'Marketing', 'Sales', 'Support', 'HR', 'Finance'];
+    final domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'company.com'];
 
-    return List.generate(15, (index) {
+    return List.generate(35, (index) {
       final name = names[index];
       final email = '${name.toLowerCase().replaceAll(' ', '.')}@${domains[index % domains.length]}';
       final role = roles[index % roles.length];
       final status = statuses[index % statuses.length];
+      final department = departments[index % departments.length];
       final lastLogin = DateTime.now().subtract(Duration(days: index % 30));
+      final salary = 50000 + (index * 2000) + (index % 5 * 5000);
 
       return GridRow(
         id: '${index + 1}',
@@ -395,7 +466,9 @@ class _MyGridPageState extends State<MyGridPage> {
           'email': email,
           'status': status,
           'role': role,
+          'department': department,
           'lastLogin': _formatDate(lastLogin),
+          'salary': salary.toString(),
         },
         actions: [
           GridAction(
@@ -454,23 +527,61 @@ class _MyGridPageState extends State<MyGridPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('User Details'),
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.blue.shade100,
+              child: Text(
+                rowData['name'].toString().substring(0, 1).toUpperCase(),
+                style: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('User Details')),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ID: ${rowData['id']}'),
-            Text('Name: ${rowData['name']}'),
-            Text('Email: ${rowData['email']}'),
-            Text('Status: ${rowData['status']}'),
-            Text('Role: ${rowData['role']}'),
-            Text('Last Login: ${rowData['lastLogin']}'),
+            _buildDetailRow('ID', rowData['id']),
+            _buildDetailRow('Name', rowData['name']),
+            _buildDetailRow('Email', rowData['email']),
+            _buildDetailRow('Status', rowData['status']),
+            _buildDetailRow('Role', rowData['role']),
+            _buildDetailRow('Department', rowData['department']),
+            _buildDetailRow('Last Login', rowData['lastLogin']),
+            _buildDetailRow('Salary', '\$${rowData['salary']}'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(fontWeight: FontWeight.w500, color: Colors.grey.shade700),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: Colors.grey.shade900),
+            ),
           ),
         ],
       ),
@@ -492,7 +603,10 @@ class _MyGridPageState extends State<MyGridPage> {
             onPressed: () {
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('User updated successfully!')),
+                SnackBar(
+                  content: Text('User ${rowData['name']} updated successfully!'),
+                  backgroundColor: Colors.green,
+                ),
               );
             },
             child: Text('Save'),
@@ -520,7 +634,10 @@ class _MyGridPageState extends State<MyGridPage> {
                 rows.removeWhere((row) => row.id == rowId);
               });
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('User deleted successfully!')),
+                SnackBar(
+                  content: Text('User ${rowData['name']} deleted successfully!'),
+                  backgroundColor: Colors.red,
+                ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -531,152 +648,63 @@ class _MyGridPageState extends State<MyGridPage> {
     );
   }
 
-  void _refreshData() {
-    setState(() {
-      isLoading = true;
-    });
-    
-    // Simulate loading
-    Future.delayed(Duration(seconds: 2), () {
-      setState(() {
-        isLoading = false;
-        rows = _generateSampleData();
-      });
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dexef Grid - Responsive Example'),
+        title: Text('Advanced Grid Example'),
+        backgroundColor: Colors.blue.shade600,
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _refreshData,
-            tooltip: 'Refresh Data',
-          ),
-          IconButton(
-            icon: Icon(Icons.info),
-            onPressed: () => _showInfo(),
-            tooltip: 'Info',
-          ),
+          if (selectedRowIds.isNotEmpty) ...[
+            Container(
+              margin: EdgeInsets.only(right: 16),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${selectedRowIds.length} selected',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue.shade50, Colors.white],
+          ),
+        ),
         child: Column(
           children: [
-            // Info card
-            Card(
+            Expanded(
               child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Responsive Grid Demo',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'This grid automatically adapts to different screen sizes. Try resizing your browser window or testing on mobile devices.',
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                    SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.phone_android, size: 16, color: Colors.green),
-                            SizedBox(width: 4),
-                            Text('Mobile: < 768px'),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.tablet_android, size: 16, color: Colors.orange),
-                            SizedBox(width: 4),
-                            Text('Tablet: 768px - 1024px'),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.desktop_windows, size: 16, color: Colors.blue),
-                            SizedBox(width: 4),
-                            Text('Desktop: > 1024px'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
+                padding: const EdgeInsets.all(16.0),
+                child: CustomGridWidget(
+                  columns: columns,
+                  rows: rows,
+                  config: config,
+                  actions: actions,
+                  isLoading: isLoading,
+                  searchTerm: searchTerm,
+                  filters: filters,
+                  sortColumn: sortColumn,
+                  sortAscending: sortAscending,
+                  selectedRowIds: selectedRowIds,
+                  currentPage: currentPage,
+                  itemsPerPage: itemsPerPage,
+                  totalItems: rows.length,
                 ),
               ),
             ),
-            SizedBox(height: 16),
-            
-            // Grid
-            Expanded(
-              child: CustomGridWidget(
-                columns: columns,
-                rows: rows,
-                config: config,
-                actions: actions,
-                isLoading: isLoading,
-                searchTerm: searchTerm,
-                filters: filters,
-                sortColumn: sortColumn,
-                sortAscending: sortAscending,
-                selectedRowIds: selectedRowIds,
-                currentPage: currentPage,
-                itemsPerPage: itemsPerPage,
-                totalItems: rows.length,
-              ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('About Dexef Grid'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Features demonstrated:'),
-            SizedBox(height: 8),
-            Text('• Responsive design (mobile/tablet/desktop)'),
-            Text('• Column sorting and filtering'),
-            Text('• Global search functionality'),
-            Text('• Row selection (single/multi)'),
-            Text('• Custom cell builders'),
-            Text('• Row actions (view/edit/delete)'),
-            Text('• Pagination'),
-            Text('• Loading states'),
-            Text('• Custom styling'),
-            SizedBox(height: 8),
-            Text('Try resizing the window to see the responsive behavior!'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
       ),
     );
   }

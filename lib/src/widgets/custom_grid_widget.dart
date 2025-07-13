@@ -8,7 +8,7 @@ import 'grid_filter_widget.dart';
 import 'grid_pagination_widget.dart';
 import 'grid_actions_widget.dart';
 
-/// A comprehensive custom grid widget with search, filter, pagination, and other features
+/// A comprehensive custom grid widget with advanced features
 class CustomGridWidget extends StatefulWidget {
   /// List of columns defining the grid structure
   final List<GridColumn> columns;
@@ -126,6 +126,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
   late int _itemsPerPage;
   late ScrollController _horizontalScrollController;
   late ScrollController _verticalScrollController;
+  bool _showAdvancedFilters = false;
 
   @override
   void initState() {
@@ -379,6 +380,31 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     widget.actions.onActionTriggered?.call(actionId, rowId, row.data);
   }
 
+  void _onSelectAll(bool? value) {
+    setState(() {
+      if (value == true) {
+        _selectedRowIds.clear();
+        _selectedRowIds.addAll(_displayedRows.map((r) => r.id));
+      } else {
+        _selectedRowIds.clear();
+      }
+    });
+    
+    if (value == true) {
+      final selectedRows = _displayedRows;
+      widget.actions.onMultiRowSelected?.call(
+        _selectedRowIds,
+        selectedRows.map((r) => r.data).toList(),
+      );
+    }
+  }
+
+  void _toggleAdvancedFilters() {
+    setState(() {
+      _showAdvancedFilters = !_showAdvancedFilters;
+    });
+  }
+
   /// Get responsive column width based on screen size
   double _getResponsiveColumnWidth(GridColumn column, double availableWidth) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -519,18 +545,9 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
           ),
           child: Column(
             children: [
-              // Toolbar
-              if (widget.showToolbar && widget.config.showSearch) ...[
-                widget.customToolbar ??
-                    GridSearchWidget(
-                      searchTerm: _searchTerm ?? '',
-                      placeholder: widget.config.searchPlaceholder,
-                      onSearch: _onSearch,
-                      columns: widget.columns.where((col) => col.searchable).toList(),
-                      onFilter: _onFilter,
-                      filters: _filters,
-                      showFilter: widget.config.showFilter,
-                    ),
+              // Advanced Toolbar
+              if (widget.showToolbar) ...[
+                widget.customToolbar ?? _buildAdvancedToolbar(),
                 const SizedBox(height: 8),
               ],
 
@@ -566,9 +583,283 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     );
   }
 
+  Widget _buildAdvancedToolbar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Search and Basic Controls
+          Row(
+            children: [
+              // Search
+              if (widget.config.showSearch) ...[
+                Expanded(
+                  child: GridSearchWidget(
+                    searchTerm: _searchTerm ?? '',
+                    placeholder: widget.config.searchPlaceholder,
+                    onSearch: _onSearch,
+                    columns: widget.columns.where((col) => col.searchable).toList(),
+                    onFilter: _onFilter,
+                    filters: _filters,
+                    showFilter: widget.config.showFilter,
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+              
+              // Advanced Filters Toggle
+              if (widget.config.showFilter) ...[
+                ElevatedButton.icon(
+                  onPressed: _toggleAdvancedFilters,
+                  icon: Icon(_showAdvancedFilters ? Icons.filter_alt : Icons.filter_alt_outlined),
+                  label: Text(_showAdvancedFilters ? 'Hide Filters' : 'Advanced Filters'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _showAdvancedFilters ? Colors.blue.shade100 : null,
+                    foregroundColor: _showAdvancedFilters ? Colors.blue.shade800 : null,
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+              
+              // Selection Info
+              if (widget.config.showSelection && _selectedRowIds.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${_selectedRowIds.length} selected',
+                    style: TextStyle(
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+              
+              // Clear All
+              if (_filters.isNotEmpty || _searchTerm?.isNotEmpty == true) ...[
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _filters.clear();
+                      _searchTerm = null;
+                      _currentPage = 1;
+                    });
+                    _updateFilteredRows();
+                  },
+                  icon: const Icon(Icons.clear_all),
+                  label: const Text('Clear All'),
+                ),
+              ],
+            ],
+          ),
+          
+          // Advanced Filters Section
+          if (_showAdvancedFilters && widget.config.showFilter) ...[
+            const SizedBox(height: 16),
+            _buildAdvancedFiltersSection(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdvancedFiltersSection() {
+    final filterableColumns = widget.columns.where((col) => col.filterable).toList();
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.filter_list, color: Colors.blue.shade600),
+              const SizedBox(width: 8),
+              Text(
+                'Advanced Filters',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const Spacer(),
+              if (_filters.isNotEmpty) ...[
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _filters.clear();
+                      _currentPage = 1;
+                    });
+                    _updateFilteredRows();
+                  },
+                  child: const Text('Clear Filters'),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: filterableColumns.map((column) {
+              final columnFilters = _filters.entries
+                  .where((entry) => entry.key.startsWith('${column.id}|'))
+                  .toList();
+              final hasFilter = columnFilters.isNotEmpty;
+              
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: hasFilter ? Colors.blue.shade50 : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: hasFilter ? Colors.blue.shade200 : Colors.grey.shade200,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.filter_alt,
+                          size: 16,
+                          color: hasFilter ? Colors.blue.shade600 : Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          column.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: hasFilter ? Colors.blue.shade800 : Colors.grey.shade700,
+                          ),
+                        ),
+                        if (hasFilter) ...[
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _filters.removeWhere((key, _) => key.startsWith('${column.id}|'));
+                                _currentPage = 1;
+                              });
+                              _updateFilteredRows();
+                            },
+                            icon: Icon(Icons.close, size: 16),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFilterInput(column),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterInput(GridColumn column) {
+    final filterTypes = ['contains', 'exact', 'startsWith', 'endsWith'];
+    String currentFilterType = 'contains';
+    String currentFilterValue = '';
+    
+    // Find existing filter for this column
+    final existingFilter = _filters.entries
+        .where((entry) => entry.key.startsWith('${column.id}|'))
+        .firstOrNull;
+    
+    if (existingFilter != null) {
+      final parts = existingFilter.key.split('|');
+      currentFilterType = parts.length > 1 ? parts[1] : 'contains';
+      currentFilterValue = existingFilter.value;
+    }
+    
+    return Row(
+      children: [
+        // Filter Type Dropdown
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: DropdownButton<String>(
+            value: currentFilterType,
+            underline: const SizedBox(),
+            items: filterTypes.map((type) {
+              return DropdownMenuItem(
+                value: type,
+                child: Text(
+                  type.replaceAll(RegExp(r'([A-Z])'), ' \$1').toLowerCase(),
+                  style: const TextStyle(fontSize: 12),
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null && currentFilterValue.isNotEmpty) {
+                setState(() {
+                  _filters.removeWhere((key, _) => key.startsWith('${column.id}|'));
+                  _filters['${column.id}|$value'] = currentFilterValue;
+                  _currentPage = 1;
+                });
+                _updateFilteredRows();
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Filter Value Input
+        Expanded(
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Filter ${column.title}...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            style: const TextStyle(fontSize: 12),
+            onChanged: (value) {
+              setState(() {
+                _filters.removeWhere((key, _) => key.startsWith('${column.id}|'));
+                if (value.isNotEmpty) {
+                  _filters['${column.id}|$currentFilterType'] = value;
+                }
+                _currentPage = 1;
+              });
+              _updateFilteredRows();
+            },
+            controller: TextEditingController(text: currentFilterValue),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHeader(double availableWidth, double totalWidth, bool needsHorizontalScroll) {
     return Container(
-      height: widget.config.headerHeight,
+      height: _getResponsiveHeaderHeight(),
       decoration: BoxDecoration(
         color: widget.config.headerBackgroundColor,
         border: Border(
@@ -583,7 +874,13 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
           if (widget.config.showSelection) ...[
             SizedBox(
               width: 60,
-              child: Center(child: Checkbox(value: false, onChanged: null)),
+              child: Center(
+                child: Checkbox(
+                  value: _selectedRowIds.length == _displayedRows.length && _displayedRows.isNotEmpty,
+                  tristate: true,
+                  onChanged: _onSelectAll,
+                ),
+              ),
             ),
           ],
           ...widget.columns.where((col) => col.visible).map((column) {
