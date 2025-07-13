@@ -344,31 +344,77 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     widget.actions.onActionTriggered?.call(actionId, rowId, row.data);
   }
 
-  /// Calculate the total width needed for all columns
-  double _calculateTotalColumnWidth() {
+  /// Get responsive column width based on screen size
+  double _getResponsiveColumnWidth(GridColumn column, double availableWidth) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < widget.config.mobileBreakpoint;
+    final isTablet = screenWidth >= widget.config.mobileBreakpoint && screenWidth < widget.config.tabletBreakpoint;
+    
+    if (isMobile) {
+      // On mobile, use flexible widths with minimum constraints
+      return column.width ?? (availableWidth / widget.columns.length).clamp(
+        widget.config.mobileMinColumnWidth, 
+        widget.config.mobileMaxColumnWidth
+      );
+    } else if (isTablet) {
+      // On tablet, use medium widths
+      return column.width ?? (availableWidth / widget.columns.length).clamp(
+        widget.config.tabletMinColumnWidth, 
+        widget.config.tabletMaxColumnWidth
+      );
+    } else {
+      // On desktop, use specified width or default
+      return column.width ?? widget.config.desktopDefaultColumnWidth;
+    }
+  }
+
+  /// Calculate total width needed for all columns
+  double _calculateTotalColumnWidth(double availableWidth) {
     double totalWidth = 0;
     
     // Selection column width
     if (widget.config.showSelection) {
-      totalWidth += 50;
+      totalWidth += 60; // Slightly wider for better touch targets on mobile
     }
     
     // Data columns width
     for (final column in widget.columns.where((col) => col.visible)) {
-      totalWidth += column.width ?? 150; // Default width of 150
+      totalWidth += _getResponsiveColumnWidth(column, availableWidth);
     }
     
     // Actions column width
     if (widget.config.showActions) {
-      totalWidth += 50;
+      totalWidth += 80; // Wider for action buttons
     }
     
     return totalWidth;
   }
 
-  /// Get the width for a specific column
-  double _getColumnWidth(GridColumn column) {
-    return column.width ?? 150; // Default width of 150
+  /// Check if horizontal scrolling is needed
+  bool _needsHorizontalScroll(double availableWidth) {
+    if (!widget.config.shouldEnableHorizontalScroll(MediaQuery.of(context).size.width)) {
+      return false;
+    }
+    final totalWidth = _calculateTotalColumnWidth(availableWidth);
+    return totalWidth > availableWidth;
+  }
+
+  /// Get responsive row height
+  double _getResponsiveRowHeight() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return widget.config.getResponsiveRowHeight(screenWidth);
+  }
+
+  /// Get responsive header height
+  double _getResponsiveHeaderHeight() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return widget.config.getResponsiveHeaderHeight(screenWidth);
+  }
+
+  /// Check if headers should be shown
+  bool _shouldShowHeaders() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return widget.config.shouldShowHeaders(screenWidth);
   }
 
   @override
@@ -385,68 +431,74 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
       return _buildEmptyState();
     }
 
-    return Container(
-      width: widget.config.gridWidth,
-      height: widget.config.gridHeight,
-      margin: widget.config.margin,
-      decoration: BoxDecoration(
-        color: widget.config.backgroundColor,
-        borderRadius: widget.config.borderRadius,
-        border: widget.config.border,
-        boxShadow: widget.config.shadow,
-      ),
-      child: Column(
-        children: [
-          // Toolbar
-          if (widget.showToolbar && widget.config.showSearch) ...[
-            widget.customToolbar ??
-                GridSearchWidget(
-                  searchTerm: _searchTerm ?? '',
-                  placeholder: widget.config.searchPlaceholder,
-                  onSearch: _onSearch,
-                  columns: widget.columns.where((col) => col.searchable).toList(),
-                  onFilter: _onFilter,
-                  filters: _filters,
-                  showFilter: widget.config.showFilter,
-                ),
-            const SizedBox(height: 8),
-          ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final needsHorizontalScroll = _needsHorizontalScroll(availableWidth);
+        final totalWidth = _calculateTotalColumnWidth(availableWidth);
 
-          // Header
-          if (widget.showHeader && widget.config.showHeader) ...[
-            widget.customHeader ?? _buildHeader(),
-            const SizedBox(height: 8),
-          ],
-
-          // Grid content with horizontal scrolling
-          Expanded(
-            child: _buildGridContent(),
+        return Container(
+          width: widget.config.gridWidth ?? availableWidth,
+          height: widget.config.gridHeight,
+          margin: widget.config.margin,
+          decoration: BoxDecoration(
+            color: widget.config.backgroundColor,
+            borderRadius: widget.config.borderRadius,
+            border: widget.config.border,
+            boxShadow: widget.config.shadow,
           ),
+          child: Column(
+            children: [
+              // Toolbar
+              if (widget.showToolbar && widget.config.showSearch) ...[
+                widget.customToolbar ??
+                    GridSearchWidget(
+                      searchTerm: _searchTerm ?? '',
+                      placeholder: widget.config.searchPlaceholder,
+                      onSearch: _onSearch,
+                      columns: widget.columns.where((col) => col.searchable).toList(),
+                      onFilter: _onFilter,
+                      filters: _filters,
+                      showFilter: widget.config.showFilter,
+                    ),
+                const SizedBox(height: 8),
+              ],
 
-          // Footer
-          if (widget.showFooter && widget.config.showPagination) ...[
-            const SizedBox(height: 8),
-            widget.customFooter ??
-                GridPaginationWidget(
-                  currentPage: _currentPage,
-                  totalPages: (_filteredRows.length / _itemsPerPage).ceil(),
-                  totalItems: _filteredRows.length,
-                  itemsPerPage: _itemsPerPage,
-                  itemsPerPageOptions: widget.config.itemsPerPageOptions,
-                  onPageChanged: _onPageChanged,
-                  onItemsPerPageChanged: _onItemsPerPageChanged,
-                ),
-          ],
-        ],
-      ),
+              // Header
+              if (widget.showHeader && widget.config.showHeader && _shouldShowHeaders()) ...[
+                widget.customHeader ?? _buildHeader(availableWidth, totalWidth, needsHorizontalScroll),
+                const SizedBox(height: 8),
+              ],
+
+              // Grid content
+              Expanded(
+                child: _buildGridContent(availableWidth, totalWidth, needsHorizontalScroll),
+              ),
+
+              // Footer
+              if (widget.showFooter && widget.config.showPagination) ...[
+                const SizedBox(height: 8),
+                widget.customFooter ??
+                    GridPaginationWidget(
+                      currentPage: _currentPage,
+                      totalPages: (_filteredRows.length / _itemsPerPage).ceil(),
+                      totalItems: _filteredRows.length,
+                      itemsPerPage: _itemsPerPage,
+                      itemsPerPageOptions: widget.config.itemsPerPageOptions,
+                      onPageChanged: _onPageChanged,
+                      onItemsPerPageChanged: _onItemsPerPageChanged,
+                    ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader() {
-    final totalWidth = _calculateTotalColumnWidth();
-    
+  Widget _buildHeader(double availableWidth, double totalWidth, bool needsHorizontalScroll) {
     return Container(
-      height: widget.config.headerHeight,
+      height: _getResponsiveHeaderHeight(),
       decoration: BoxDecoration(
         color: widget.config.headerBackgroundColor,
         border: Border(
@@ -456,58 +508,65 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
           ),
         ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        controller: _horizontalScrollController,
-        child: SizedBox(
-          width: totalWidth,
-          child: Row(
-            children: [
-              if (widget.config.showSelection) ...[
-                SizedBox(
-                  width: 50,
-                  child: Checkbox(
-                    value: _selectedRowIds.length == _displayedRows.length && _displayedRows.isNotEmpty,
-                    tristate: true,
-                    onChanged: (value) {
-                      if (value == true) {
-                        setState(() {
-                          _selectedRowIds.clear();
-                          _selectedRowIds.addAll(_displayedRows.map((r) => r.id));
-                        });
-                      } else {
-                        setState(() {
-                          _selectedRowIds.clear();
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ],
-              ...widget.columns.where((col) => col.visible).map((column) {
-                return SizedBox(
-                  width: _getColumnWidth(column),
-                  child: _buildHeaderCell(column),
-                );
-              }),
-              if (widget.config.showActions) ...[
-                SizedBox(
-                  width: 50,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    child: const Text(
-                      'Actions',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+      child: needsHorizontalScroll
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              controller: _horizontalScrollController,
+              child: SizedBox(
+                width: totalWidth,
+                child: _buildHeaderRow(availableWidth),
+              ),
+            )
+          : _buildHeaderRow(availableWidth),
+    );
+  }
+
+  Widget _buildHeaderRow(double availableWidth) {
+    return Row(
+      children: [
+        if (widget.config.showSelection) ...[
+          SizedBox(
+            width: 60,
+            child: Checkbox(
+              value: _selectedRowIds.length == _displayedRows.length && _displayedRows.isNotEmpty,
+              tristate: true,
+              onChanged: (value) {
+                if (value == true) {
+                  setState(() {
+                    _selectedRowIds.clear();
+                    _selectedRowIds.addAll(_displayedRows.map((r) => r.id));
+                  });
+                } else {
+                  setState(() {
+                    _selectedRowIds.clear();
+                  });
+                }
+              },
+            ),
           ),
-        ),
-      ),
+        ],
+        ...widget.columns.where((col) => col.visible).map((column) {
+          return SizedBox(
+            width: _getResponsiveColumnWidth(column, availableWidth),
+            child: _buildHeaderCell(column),
+          );
+        }),
+        if (widget.config.showActions) ...[
+          SizedBox(
+            width: 80,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              child: const Text(
+                'Actions',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -530,6 +589,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                       fontWeight: FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
             ),
             if (column.sortable) ...[
@@ -548,31 +608,35 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     );
   }
 
-  Widget _buildGridContent() {
-    final totalWidth = _calculateTotalColumnWidth();
-    
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      controller: _horizontalScrollController,
-      child: SizedBox(
-        width: totalWidth,
-        child: ListView.separated(
-          controller: _verticalScrollController,
-          itemCount: _displayedRows.length,
-          separatorBuilder: (context, index) => Container(
-            height: widget.config.rowSpacing,
-            color: widget.config.rowBorderColor ?? Colors.grey.shade200,
-          ),
-          itemBuilder: (context, index) {
-            final row = _displayedRows[index];
-            return _buildRow(row, index);
-          },
-        ),
+  Widget _buildGridContent(double availableWidth, double totalWidth, bool needsHorizontalScroll) {
+    return needsHorizontalScroll
+        ? SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            controller: _horizontalScrollController,
+            child: SizedBox(
+              width: totalWidth,
+              child: _buildGridRows(availableWidth),
+            ),
+          )
+        : _buildGridRows(availableWidth);
+  }
+
+  Widget _buildGridRows(double availableWidth) {
+    return ListView.separated(
+      controller: _verticalScrollController,
+      itemCount: _displayedRows.length,
+      separatorBuilder: (context, index) => Container(
+        height: widget.config.rowSpacing,
+        color: widget.config.rowBorderColor ?? Colors.grey.shade200,
       ),
+      itemBuilder: (context, index) {
+        final row = _displayedRows[index];
+        return _buildRow(row, index, availableWidth);
+      },
     );
   }
 
-  Widget _buildRow(GridRow row, int index) {
+  Widget _buildRow(GridRow row, int index, double availableWidth) {
     final isSelected = _selectedRowIds.contains(row.id);
     final isHovered = false; // TODO: Implement hover state
 
@@ -582,7 +646,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
         onTap: () => _onRowTap(row.id, index),
         onDoubleTap: () => _onRowDoubleTap(row.id, index),
         child: Container(
-          height: widget.config.rowHeight,
+          height: _getResponsiveRowHeight(),
           decoration: BoxDecoration(
             color: isSelected
                 ? widget.config.selectedRowBackgroundColor
@@ -600,7 +664,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
             children: [
               if (widget.config.showSelection) ...[
                 SizedBox(
-                  width: 50,
+                  width: 60,
                   child: Checkbox(
                     value: isSelected,
                     onChanged: row.selectable
@@ -611,13 +675,13 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
               ],
               ...widget.columns.where((col) => col.visible).map((column) {
                 return SizedBox(
-                  width: _getColumnWidth(column),
+                  width: _getResponsiveColumnWidth(column, availableWidth),
                   child: _buildCell(row, column, index),
                 );
               }),
               if (widget.config.showActions && row.actions != null) ...[
                 SizedBox(
-                  width: 50,
+                  width: 80,
                   child: GridActionsWidget(
                     actions: row.actions!,
                     rowId: row.id,
@@ -649,7 +713,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                   : widget.config.rowTextColor,
             ),
             overflow: TextOverflow.ellipsis,
-            maxLines: 1,
+            maxLines: 2, // Allow 2 lines for better mobile experience
           ),
     );
   }

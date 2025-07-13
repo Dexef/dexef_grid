@@ -155,6 +155,64 @@ class GridConfig {
   /// Custom toolbar widget
   final Widget? customToolbarWidget;
 
+  // Responsive configuration
+  /// Minimum column width for mobile devices
+  final double mobileMinColumnWidth;
+  
+  /// Maximum column width for mobile devices
+  final double mobileMaxColumnWidth;
+  
+  /// Minimum column width for tablet devices
+  final double tabletMinColumnWidth;
+  
+  /// Maximum column width for tablet devices
+  final double tabletMaxColumnWidth;
+  
+  /// Default column width for desktop devices
+  final double desktopDefaultColumnWidth;
+  
+  /// Whether to enable horizontal scrolling on mobile
+  final bool enableMobileHorizontalScroll;
+  
+  /// Whether to enable horizontal scrolling on tablet
+  final bool enableTabletHorizontalScroll;
+  
+  /// Whether to enable horizontal scrolling on desktop
+  final bool enableDesktopHorizontalScroll;
+  
+  /// Mobile breakpoint width
+  final double mobileBreakpoint;
+  
+  /// Tablet breakpoint width
+  final double tabletBreakpoint;
+  
+  /// Whether to show column headers on mobile
+  final bool showMobileHeaders;
+  
+  /// Whether to show column headers on tablet
+  final bool showTabletHeaders;
+  
+  /// Whether to show column headers on desktop
+  final bool showDesktopHeaders;
+  
+  /// Mobile row height
+  final double mobileRowHeight;
+  
+  /// Tablet row height
+  final double tabletRowHeight;
+  
+  /// Desktop row height
+  final double desktopRowHeight;
+  
+  /// Mobile header height
+  final double mobileHeaderHeight;
+  
+  /// Tablet header height
+  final double tabletHeaderHeight;
+  
+  /// Desktop header height
+  final double desktopHeaderHeight;
+
   const GridConfig({
     this.showHeader = true,
     this.showSelection = true,
@@ -207,6 +265,26 @@ class GridConfig {
     this.customHeaderWidget,
     this.customFooterWidget,
     this.customToolbarWidget,
+    // Responsive configuration
+    this.mobileMinColumnWidth = 80.0,
+    this.mobileMaxColumnWidth = 200.0,
+    this.tabletMinColumnWidth = 120.0,
+    this.tabletMaxColumnWidth = 300.0,
+    this.desktopDefaultColumnWidth = 200.0,
+    this.enableMobileHorizontalScroll = true,
+    this.enableTabletHorizontalScroll = true,
+    this.enableDesktopHorizontalScroll = true,
+    this.mobileBreakpoint = 768.0,
+    this.tabletBreakpoint = 1024.0,
+    this.showMobileHeaders = true,
+    this.showTabletHeaders = true,
+    this.showDesktopHeaders = true,
+    this.mobileRowHeight = 60.0,
+    this.tabletRowHeight = 55.0,
+    this.desktopRowHeight = 50.0,
+    this.mobileHeaderHeight = 60.0,
+    this.tabletHeaderHeight = 55.0,
+    this.desktopHeaderHeight = 50.0,
   });
 
   /// Creates a copy of this config with updated properties
@@ -262,6 +340,26 @@ class GridConfig {
     Widget? customHeaderWidget,
     Widget? customFooterWidget,
     Widget? customToolbarWidget,
+    // Responsive configuration
+    double? mobileMinColumnWidth,
+    double? mobileMaxColumnWidth,
+    double? tabletMinColumnWidth,
+    double? tabletMaxColumnWidth,
+    double? desktopDefaultColumnWidth,
+    bool? enableMobileHorizontalScroll,
+    bool? enableTabletHorizontalScroll,
+    bool? enableDesktopHorizontalScroll,
+    double? mobileBreakpoint,
+    double? tabletBreakpoint,
+    bool? showMobileHeaders,
+    bool? showTabletHeaders,
+    bool? showDesktopHeaders,
+    double? mobileRowHeight,
+    double? tabletRowHeight,
+    double? desktopRowHeight,
+    double? mobileHeaderHeight,
+    double? tabletHeaderHeight,
+    double? desktopHeaderHeight,
   }) {
     return GridConfig(
       showHeader: showHeader ?? this.showHeader,
@@ -315,7 +413,71 @@ class GridConfig {
       customHeaderWidget: customHeaderWidget ?? this.customHeaderWidget,
       customFooterWidget: customFooterWidget ?? this.customFooterWidget,
       customToolbarWidget: customToolbarWidget ?? this.customToolbarWidget,
+      // Responsive configuration
+      mobileMinColumnWidth: mobileMinColumnWidth ?? this.mobileMinColumnWidth,
+      mobileMaxColumnWidth: mobileMaxColumnWidth ?? this.mobileMaxColumnWidth,
+      tabletMinColumnWidth: tabletMinColumnWidth ?? this.tabletMinColumnWidth,
+      tabletMaxColumnWidth: tabletMaxColumnWidth ?? this.tabletMaxColumnWidth,
+      desktopDefaultColumnWidth: desktopDefaultColumnWidth ?? this.desktopDefaultColumnWidth,
+      enableMobileHorizontalScroll: enableMobileHorizontalScroll ?? this.enableMobileHorizontalScroll,
+      enableTabletHorizontalScroll: enableTabletHorizontalScroll ?? this.enableTabletHorizontalScroll,
+      enableDesktopHorizontalScroll: enableDesktopHorizontalScroll ?? this.enableDesktopHorizontalScroll,
+      mobileBreakpoint: mobileBreakpoint ?? this.mobileBreakpoint,
+      tabletBreakpoint: tabletBreakpoint ?? this.tabletBreakpoint,
+      showMobileHeaders: showMobileHeaders ?? this.showMobileHeaders,
+      showTabletHeaders: showTabletHeaders ?? this.showTabletHeaders,
+      showDesktopHeaders: showDesktopHeaders ?? this.showDesktopHeaders,
+      mobileRowHeight: mobileRowHeight ?? this.mobileRowHeight,
+      tabletRowHeight: tabletRowHeight ?? this.tabletRowHeight,
+      desktopRowHeight: desktopRowHeight ?? this.desktopRowHeight,
+      mobileHeaderHeight: mobileHeaderHeight ?? this.mobileHeaderHeight,
+      tabletHeaderHeight: tabletHeaderHeight ?? this.tabletHeaderHeight,
+      desktopHeaderHeight: desktopHeaderHeight ?? this.desktopHeaderHeight,
     );
+  }
+
+  /// Get responsive row height based on screen width
+  double getResponsiveRowHeight(double screenWidth) {
+    if (screenWidth < mobileBreakpoint) {
+      return mobileRowHeight;
+    } else if (screenWidth < tabletBreakpoint) {
+      return tabletRowHeight;
+    } else {
+      return desktopRowHeight;
+    }
+  }
+
+  /// Get responsive header height based on screen width
+  double getResponsiveHeaderHeight(double screenWidth) {
+    if (screenWidth < mobileBreakpoint) {
+      return mobileHeaderHeight;
+    } else if (screenWidth < tabletBreakpoint) {
+      return tabletHeaderHeight;
+    } else {
+      return desktopHeaderHeight;
+    }
+  }
+
+  /// Check if headers should be shown based on screen width
+  bool shouldShowHeaders(double screenWidth) {
+    if (screenWidth < mobileBreakpoint) {
+      return showMobileHeaders;
+    } else if (screenWidth < tabletBreakpoint) {
+      return showTabletHeaders;
+    } else {
+      return showDesktopHeaders;
+    }
+  }
+
+  /// Check if horizontal scrolling should be enabled based on screen width
+  bool shouldEnableHorizontalScroll(double screenWidth) {
+    if (screenWidth < mobileBreakpoint) {
+      return enableMobileHorizontalScroll;
+    } else if (screenWidth < tabletBreakpoint) {
+      return enableTabletHorizontalScroll;
+    } else {
+      return enableDesktopHorizontalScroll;
+    }
   }
 
   @override
