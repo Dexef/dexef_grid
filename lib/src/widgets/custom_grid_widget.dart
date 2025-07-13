@@ -124,11 +124,22 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
   late bool? _sortAscending;
   late int _currentPage;
   late int _itemsPerPage;
+  late ScrollController _horizontalScrollController;
+  late ScrollController _verticalScrollController;
 
   @override
   void initState() {
     super.initState();
+    _horizontalScrollController = ScrollController();
+    _verticalScrollController = ScrollController();
     _initializeState();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    _verticalScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -333,6 +344,33 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
     widget.actions.onActionTriggered?.call(actionId, rowId, row.data);
   }
 
+  /// Calculate the total width needed for all columns
+  double _calculateTotalColumnWidth() {
+    double totalWidth = 0;
+    
+    // Selection column width
+    if (widget.config.showSelection) {
+      totalWidth += 50;
+    }
+    
+    // Data columns width
+    for (final column in widget.columns.where((col) => col.visible)) {
+      totalWidth += column.width ?? 150; // Default width of 150
+    }
+    
+    // Actions column width
+    if (widget.config.showActions) {
+      totalWidth += 50;
+    }
+    
+    return totalWidth;
+  }
+
+  /// Get the width for a specific column
+  double _getColumnWidth(GridColumn column) {
+    return column.width ?? 150; // Default width of 150
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.isLoading) {
@@ -380,7 +418,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
             const SizedBox(height: 8),
           ],
 
-          // Grid content
+          // Grid content with horizontal scrolling
           Expanded(
             child: _buildGridContent(),
           ),
@@ -405,6 +443,8 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
   }
 
   Widget _buildHeader() {
+    final totalWidth = _calculateTotalColumnWidth();
+    
     return Container(
       height: widget.config.headerHeight,
       decoration: BoxDecoration(
@@ -416,40 +456,57 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
           ),
         ),
       ),
-      child: Row(
-        children: [
-          if (widget.config.showSelection) ...[
-            SizedBox(
-              width: 50,
-              child: Checkbox(
-                value: _selectedRowIds.length == _displayedRows.length && _displayedRows.isNotEmpty,
-                tristate: true,
-                onChanged: (value) {
-                  if (value == true) {
-                    setState(() {
-                      _selectedRowIds.clear();
-                      _selectedRowIds.addAll(_displayedRows.map((r) => r.id));
-                    });
-                  } else {
-                    setState(() {
-                      _selectedRowIds.clear();
-                    });
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          ...widget.columns.where((col) => col.visible).map((column) {
-            return Expanded(
-              flex: column.width?.toInt() ?? 1,
-              child: _buildHeaderCell(column),
-            );
-          }),
-          if (widget.config.showActions) ...[
-            const SizedBox(width: 50),
-          ],
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        controller: _horizontalScrollController,
+        child: SizedBox(
+          width: totalWidth,
+          child: Row(
+            children: [
+              if (widget.config.showSelection) ...[
+                SizedBox(
+                  width: 50,
+                  child: Checkbox(
+                    value: _selectedRowIds.length == _displayedRows.length && _displayedRows.isNotEmpty,
+                    tristate: true,
+                    onChanged: (value) {
+                      if (value == true) {
+                        setState(() {
+                          _selectedRowIds.clear();
+                          _selectedRowIds.addAll(_displayedRows.map((r) => r.id));
+                        });
+                      } else {
+                        setState(() {
+                          _selectedRowIds.clear();
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ],
+              ...widget.columns.where((col) => col.visible).map((column) {
+                return SizedBox(
+                  width: _getColumnWidth(column),
+                  child: _buildHeaderCell(column),
+                );
+              }),
+              if (widget.config.showActions) ...[
+                SizedBox(
+                  width: 50,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: const Text(
+                      'Actions',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -472,6 +529,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                       color: widget.config.headerTextColor,
                       fontWeight: FontWeight.bold,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
             ),
             if (column.sortable) ...[
@@ -491,16 +549,26 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
   }
 
   Widget _buildGridContent() {
-    return ListView.separated(
-      itemCount: _displayedRows.length,
-      separatorBuilder: (context, index) => Container(
-        height: widget.config.rowSpacing,
-        color: widget.config.rowBorderColor ?? Colors.grey.shade200,
+    final totalWidth = _calculateTotalColumnWidth();
+    
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      controller: _horizontalScrollController,
+      child: SizedBox(
+        width: totalWidth,
+        child: ListView.separated(
+          controller: _verticalScrollController,
+          itemCount: _displayedRows.length,
+          separatorBuilder: (context, index) => Container(
+            height: widget.config.rowSpacing,
+            color: widget.config.rowBorderColor ?? Colors.grey.shade200,
+          ),
+          itemBuilder: (context, index) {
+            final row = _displayedRows[index];
+            return _buildRow(row, index);
+          },
+        ),
       ),
-      itemBuilder: (context, index) {
-        final row = _displayedRows[index];
-        return _buildRow(row, index);
-      },
     );
   }
 
@@ -540,22 +608,23 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                         : null,
                   ),
                 ),
-                const SizedBox(width: 8),
               ],
               ...widget.columns.where((col) => col.visible).map((column) {
-                return Expanded(
-                  flex: column.width?.toInt() ?? 1,
+                return SizedBox(
+                  width: _getColumnWidth(column),
                   child: _buildCell(row, column, index),
                 );
               }),
               if (widget.config.showActions && row.actions != null) ...[
-                const SizedBox(width: 50),
-                GridActionsWidget(
-                  actions: row.actions!,
-                  rowId: row.id,
-                  onActionTriggered: _onActionTriggered,
-                  showOnHover: row.showActionsOnHover,
-                  actionBuilder: row.actionBuilder,
+                SizedBox(
+                  width: 50,
+                  child: GridActionsWidget(
+                    actions: row.actions!,
+                    rowId: row.id,
+                    onActionTriggered: _onActionTriggered,
+                    showOnHover: row.showActionsOnHover,
+                    actionBuilder: row.actionBuilder,
+                  ),
                 ),
               ],
             ],
@@ -580,6 +649,7 @@ class _CustomGridWidgetState extends State<CustomGridWidget> {
                   : widget.config.rowTextColor,
             ),
             overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
     );
   }
