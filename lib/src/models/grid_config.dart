@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 
 /// Configuration for the custom grid widget
 class GridConfig {
-  /// Whether to show the header row
+  /// Whether to show the footer
+  final bool showFooter;
+  
+  /// Whether to show the toolbar
+  final bool showToolbar;
+  
+  /// Whether to show the header
   final bool showHeader;
   
   /// Whether to show row selection checkboxes
@@ -13,6 +19,9 @@ class GridConfig {
   
   /// Whether to show filter functionality
   final bool showFilter;
+  
+  /// Whether to show auto filter row
+  final bool showAutoFilter;
   
   /// Whether to show pagination
   final bool showPagination;
@@ -103,6 +112,15 @@ class GridConfig {
   
   /// Border color of the header
   final Color? headerBorderColor;
+  
+  /// Background color of auto filter row
+  final Color? autoFilterBackgroundColor;
+  
+  /// Text color of auto filter row
+  final Color? autoFilterTextColor;
+  
+  /// Border color of auto filter row
+  final Color? autoFilterBorderColor;
   
   /// Shadow of the grid
   final List<BoxShadow>? shadow;
@@ -213,18 +231,62 @@ class GridConfig {
   /// Desktop header height
   final double desktopHeaderHeight;
 
-  const GridConfig({
+  GridConfig({
+    Color? backgroundColor,
+    Color? headerBackgroundColor,
+    Color? rowBackgroundColor,
+    Color? selectedRowBackgroundColor,
+    Color? hoverRowBackgroundColor,
+    Color? headerTextColor,
+    Color? rowTextColor,
+    Color? selectedRowTextColor,
+    Color? borderColor,
+    Color? rowBorderColor,
+    BorderRadius? borderRadius,
+    Color? autoFilterBackgroundColor,
+    Color? autoFilterTextColor,
+    Color? autoFilterBorderColor,
+    Color? headerBorderColor,
+    this.shadow = const [],
+    this.mobileMinColumnWidth = 100.0,
+    this.mobileMaxColumnWidth = 200.0,
+    this.mobileRowHeight = 60.0,
+    this.mobileHeaderHeight = 50.0,
+    this.showMobileHeaders = true,
+    this.enableMobileHorizontalScroll = true,
+    this.tabletMinColumnWidth = 120.0,
+    this.tabletMaxColumnWidth = 300.0,
+    this.tabletRowHeight = 55.0,
+    this.tabletHeaderHeight = 50.0,
+    this.showTabletHeaders = true,
+    this.enableTabletHorizontalScroll = true,
+    this.desktopDefaultColumnWidth = 200.0,
+    this.desktopRowHeight = 50.0,
+    this.desktopHeaderHeight = 45.0,
+    this.showDesktopHeaders = true,
+    this.enableDesktopHorizontalScroll = true,
+    this.mobileBreakpoint = 768.0,
+    this.tabletBreakpoint = 1024.0,
+    this.showSelection = false,
+    this.showActions = false,
+    this.showFilter = false,
+    this.showSearch = false,
+    this.showAutoFilter = false,
+    this.showPagination = false,
+    this.showToolbar = false,
     this.showHeader = true,
-    this.showSelection = true,
-    this.showSearch = true,
-    this.showFilter = true,
-    this.showPagination = true,
-    this.showActions = true,
-    this.showHoverEffects = true,
-    this.allowMultiSelection = true,
+    this.showFooter = false,
+    this.allowMultiSelection = false,
     this.allowSorting = true,
     this.allowFiltering = true,
     this.allowSearching = true,
+    this.itemsPerPage = 10,
+    this.itemsPerPageOptions = const [5, 10, 20, 50, 100],
+    this.searchPlaceholder = 'Search...',
+    this.emptyStateMessage = 'No data available',
+    this.loadingStateMessage = 'Loading...',
+    this.errorStateMessage = 'Error loading data',
+    this.showHoverEffects = true,
     this.allowColumnResize = false,
     this.allowColumnReorder = false,
     this.allowRowReorder = false,
@@ -235,57 +297,33 @@ class GridConfig {
     this.rowHeight = 50.0,
     this.gridHeight,
     this.gridWidth,
-    this.borderRadius,
     this.border,
-    this.backgroundColor,
-    this.headerBackgroundColor,
-    this.rowBackgroundColor,
-    this.selectedRowBackgroundColor,
-    this.hoverRowBackgroundColor,
-    this.headerTextColor,
-    this.rowTextColor,
-    this.selectedRowTextColor,
-    this.borderColor,
-    this.rowBorderColor,
-    this.headerBorderColor,
-    this.shadow,
     this.padding,
     this.margin,
     this.rowSpacing = 1.0,
     this.columnSpacing = 10.0,
-    this.itemsPerPage = 10,
-    this.itemsPerPageOptions = const [5, 10, 20, 50, 100],
-    this.searchPlaceholder = 'Search...',
-    this.emptyStateMessage = 'No data available',
-    this.loadingStateMessage = 'Loading...',
-    this.errorStateMessage = 'An error occurred',
     this.emptyStateWidget,
     this.loadingStateWidget,
     this.errorStateWidget,
     this.customHeaderWidget,
     this.customFooterWidget,
     this.customToolbarWidget,
-    // Responsive configuration
-    this.mobileMinColumnWidth = 80.0,
-    this.mobileMaxColumnWidth = 200.0,
-    this.tabletMinColumnWidth = 120.0,
-    this.tabletMaxColumnWidth = 300.0,
-    this.desktopDefaultColumnWidth = 200.0,
-    this.enableMobileHorizontalScroll = true,
-    this.enableTabletHorizontalScroll = true,
-    this.enableDesktopHorizontalScroll = true,
-    this.mobileBreakpoint = 768.0,
-    this.tabletBreakpoint = 1024.0,
-    this.showMobileHeaders = true,
-    this.showTabletHeaders = true,
-    this.showDesktopHeaders = true,
-    this.mobileRowHeight = 60.0,
-    this.tabletRowHeight = 55.0,
-    this.desktopRowHeight = 50.0,
-    this.mobileHeaderHeight = 60.0,
-    this.tabletHeaderHeight = 55.0,
-    this.desktopHeaderHeight = 50.0,
-  });
+  })  :
+    backgroundColor = backgroundColor ?? Colors.white,
+    headerBackgroundColor = headerBackgroundColor ?? Colors.grey.shade50,
+    rowBackgroundColor = rowBackgroundColor ?? Colors.white,
+    selectedRowBackgroundColor = selectedRowBackgroundColor ?? Colors.blue.shade50,
+    hoverRowBackgroundColor = hoverRowBackgroundColor ?? Colors.grey.shade50,
+    headerTextColor = headerTextColor ?? Colors.grey.shade800,
+    rowTextColor = rowTextColor ?? Colors.grey.shade900,
+    selectedRowTextColor = selectedRowTextColor ?? Colors.blue.shade800,
+    borderColor = borderColor ?? Colors.grey.shade200,
+    rowBorderColor = rowBorderColor ?? Colors.grey.shade100,
+    borderRadius = borderRadius ?? BorderRadius.zero,
+    autoFilterBackgroundColor = autoFilterBackgroundColor ?? Colors.grey.shade50,
+    autoFilterTextColor = autoFilterTextColor ?? Colors.grey.shade700,
+    autoFilterBorderColor = autoFilterBorderColor ?? Colors.grey.shade200,
+    headerBorderColor = headerBorderColor ?? Colors.grey.shade200;
 
   /// Creates a copy of this config with updated properties
   GridConfig copyWith({
@@ -293,6 +331,7 @@ class GridConfig {
     bool? showSelection,
     bool? showSearch,
     bool? showFilter,
+    bool? showAutoFilter,
     bool? showPagination,
     bool? showActions,
     bool? showHoverEffects,
@@ -323,6 +362,9 @@ class GridConfig {
     Color? borderColor,
     Color? rowBorderColor,
     Color? headerBorderColor,
+    Color? autoFilterBackgroundColor,
+    Color? autoFilterTextColor,
+    Color? autoFilterBorderColor,
     List<BoxShadow>? shadow,
     EdgeInsets? padding,
     EdgeInsets? margin,
@@ -366,6 +408,7 @@ class GridConfig {
       showSelection: showSelection ?? this.showSelection,
       showSearch: showSearch ?? this.showSearch,
       showFilter: showFilter ?? this.showFilter,
+      showAutoFilter: showAutoFilter ?? this.showAutoFilter,
       showPagination: showPagination ?? this.showPagination,
       showActions: showActions ?? this.showActions,
       showHoverEffects: showHoverEffects ?? this.showHoverEffects,
@@ -396,6 +439,9 @@ class GridConfig {
       borderColor: borderColor ?? this.borderColor,
       rowBorderColor: rowBorderColor ?? this.rowBorderColor,
       headerBorderColor: headerBorderColor ?? this.headerBorderColor,
+      autoFilterBackgroundColor: autoFilterBackgroundColor ?? this.autoFilterBackgroundColor,
+      autoFilterTextColor: autoFilterTextColor ?? this.autoFilterTextColor,
+      autoFilterBorderColor: autoFilterBorderColor ?? this.autoFilterBorderColor,
       shadow: shadow ?? this.shadow,
       padding: padding ?? this.padding,
       margin: margin ?? this.margin,

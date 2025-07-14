@@ -95,6 +95,9 @@ class GridActions {
   
   /// Called when the grid is loaded from storage
   final void Function(List<GridRow> rows)? onLoadFromStorage;
+  
+  /// Called when grouping changes
+  final void Function(List<String> groupedColumns)? onGroupingChanged;
 
   const GridActions({
     this.onRowSelected,
@@ -128,6 +131,7 @@ class GridActions {
     this.onReset,
     this.onSave,
     this.onLoadFromStorage,
+    this.onGroupingChanged,
   });
 
   /// Creates a copy of this actions with updated callbacks
@@ -163,6 +167,7 @@ class GridActions {
     VoidCallback? onReset,
     void Function(List<GridRow> rows)? onSave,
     void Function(List<GridRow> rows)? onLoadFromStorage,
+    void Function(List<String> groupedColumns)? onGroupingChanged,
   }) {
     return GridActions(
       onRowSelected: onRowSelected ?? this.onRowSelected,
@@ -196,6 +201,7 @@ class GridActions {
       onReset: onReset ?? this.onReset,
       onSave: onSave ?? this.onSave,
       onLoadFromStorage: onLoadFromStorage ?? this.onLoadFromStorage,
+      onGroupingChanged: onGroupingChanged ?? this.onGroupingChanged,
     );
   }
 }

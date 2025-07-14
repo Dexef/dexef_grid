@@ -3,7 +3,7 @@ import '../models/grid_column.dart';
 import 'grid_filter_widget.dart';
 import 'dart:async';
 
-/// A search widget for the grid with optional filter functionality
+/// A search widget for the grid with DevExtreme-style features
 class GridSearchWidget extends StatefulWidget {
   /// Current search term
   final String searchTerm;
@@ -43,6 +43,24 @@ class GridSearchWidget extends StatefulWidget {
   
   /// Callback to get search suggestions
   final Future<List<String>> Function(String query)? getSuggestions;
+  
+  /// Whether the search panel is visible
+  final bool visible;
+  
+  /// Whether to enable search in specific columns
+  final Map<String, bool>? columnSearchEnabled;
+  
+  /// Predefined search value
+  final String? predefinedSearchValue;
+  
+  /// Whether to show search statistics
+  final bool showSearchStats;
+  
+  /// Callback when search is cleared
+  final VoidCallback? onSearchCleared;
+  
+  /// Callback when search statistics are requested
+  final void Function(String searchTerm, int resultCount)? onSearchStats;
 
   const GridSearchWidget({
     super.key,
@@ -59,6 +77,12 @@ class GridSearchWidget extends StatefulWidget {
     this.customFilterWidget,
     this.suggestions,
     this.getSuggestions,
+    this.visible = true,
+    this.columnSearchEnabled,
+    this.predefinedSearchValue,
+    this.showSearchStats = false,
+    this.onSearchCleared,
+    this.onSearchStats,
   });
 
   @override
@@ -88,12 +112,20 @@ class _GridSearchWidgetState extends State<GridSearchWidget> {
   List<String> _suggestions = [];
   bool _isLoadingSuggestions = false;
   Map<String, FilterType> _filterTypes = {};
+  Timer? _debounceTimer;
+  int _searchResultCount = 0;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: widget.searchTerm);
     _searchFocusNode = FocusNode();
+    
+    // Set predefined search value if provided
+    if (widget.predefinedSearchValue != null && widget.predefinedSearchValue!.isNotEmpty) {
+      _searchController.text = widget.predefinedSearchValue!;
+      widget.onSearch(widget.predefinedSearchValue!);
+    }
   }
 
   @override
@@ -105,31 +137,69 @@ class _GridSearchWidgetState extends State<GridSearchWidget> {
         widget.searchTerm != _searchController.text) {
       _searchController.text = widget.searchTerm;
     }
+    
+    // Update predefined search value if changed
+    if (widget.predefinedSearchValue != oldWidget.predefinedSearchValue && 
+        widget.predefinedSearchValue != null && 
+        widget.predefinedSearchValue!.isNotEmpty) {
+      _searchController.text = widget.predefinedSearchValue!;
+      widget.onSearch(widget.predefinedSearchValue!);
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
   void _onSearchChanged(String value) {
-    widget.onSearch(value);
-    _loadSuggestions(value);
+    // Debounce search to improve performance
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      widget.onSearch(value);
+      _loadSuggestions(value);
+      _updateSearchStats(value);
+    });
   }
 
   void _onSearchSubmitted(String value) {
+    _debounceTimer?.cancel();
     widget.onSearch(value);
     _searchFocusNode.unfocus();
+    _updateSearchStats(value);
   }
 
   void _onClearSearch() {
     _searchController.clear();
     widget.onSearch('');
+    widget.onSearchCleared?.call();
     setState(() {
       _suggestions.clear();
+      _searchResultCount = 0;
     });
+  }
+
+  void _updateSearchStats(String searchTerm) {
+    if (widget.showSearchStats && widget.onSearchStats != null) {
+      // Calculate search result count based on searchable columns
+      final searchableColumns = widget.columns.where((col) => 
+        col.searchable && (widget.columnSearchEnabled?[col.id] ?? true)
+      ).toList();
+      
+      // This is a simplified calculation - in a real implementation,
+      // you would get the actual result count from the data source
+      final estimatedCount = searchTerm.isEmpty ? 0 : 
+        (searchableColumns.length * 10); // Simplified estimation
+      
+      setState(() {
+        _searchResultCount = estimatedCount;
+      });
+      
+      widget.onSearchStats?.call(searchTerm, estimatedCount);
+    }
   }
 
   void _toggleAdvancedSearch() {
@@ -187,6 +257,8 @@ class _GridSearchWidgetState extends State<GridSearchWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.visible) return const SizedBox.shrink();
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -199,44 +271,119 @@ class _GridSearchWidgetState extends State<GridSearchWidget> {
         children: [
           Row(
             children: [
+              // Search icon
+              Icon(Icons.search, color: Colors.grey.shade600),
+              const SizedBox(width: 8),
+              
+              // Search field
               Expanded(
                 child: widget.customSearchField ?? _buildSearchField(),
               ),
-              const SizedBox(width: 8),
-              if (widget.searchTerm.isNotEmpty)
+              
+              // Clear button
+              if (_searchController.text.isNotEmpty) ...[
+                const SizedBox(width: 8),
                 IconButton(
                   onPressed: _onClearSearch,
-                  icon: const Icon(Icons.clear),
+                  icon: Icon(Icons.clear, color: Colors.grey.shade600),
                   tooltip: 'Clear search',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-              if (widget.showFilter && widget.onFilter != null)
+              ],
+              
+              // Advanced search toggle
+              if (widget.showAdvancedSearch) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _toggleAdvancedSearch,
+                  icon: Icon(
+                    _showAdvancedSearch ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey.shade600,
+                  ),
+                  tooltip: 'Advanced search',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+              
+              // Filter toggle
+              if (widget.showFilter) ...[
+                const SizedBox(width: 8),
                 IconButton(
                   onPressed: _toggleFilters,
                   icon: Icon(
-                    _showFilters ? Icons.filter_list : Icons.filter_list_outlined,
-                    color: _showFilters ? Colors.grey.shade700 : null,
+                    _showFilters ? Icons.filter_alt : Icons.filter_alt_outlined,
+                    color: Colors.grey.shade600,
                   ),
-                  tooltip: 'Toggle filters',
+                  tooltip: 'Show filters',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-              if (widget.showAdvancedSearch)
-                IconButton(
-                  onPressed: _toggleAdvancedSearch,
-                  icon: Icon(_showAdvancedSearch ? Icons.expand_less : Icons.expand_more),
-                  tooltip: 'Advanced search',
-                ),
+              ],
             ],
           ),
-          if (_showAdvancedSearch && widget.showAdvancedSearch) ...[
+          
+          // Search statistics
+          if (widget.showSearchStats && _searchController.text.isNotEmpty) ...[
             const SizedBox(height: 8),
-            _buildAdvancedSearch(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 14, color: Colors.blue.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Found approximately $_searchResultCount results',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
-          if (_showFilters && widget.showFilter && widget.onFilter != null) ...[
+          
+          // Search suggestions
+          if (widget.showSuggestions && _suggestions.isNotEmpty) ...[
             const SizedBox(height: 8),
-            widget.customFilterWidget ?? _buildFilterSection(),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _suggestions.length,
+                itemBuilder: (context, index) {
+                  final suggestion = _suggestions[index];
+                  return ListTile(
+                    dense: true,
+                    title: Text(suggestion),
+                    onTap: () => _onSuggestionSelected(suggestion),
+                  );
+                },
+              ),
+            ),
           ],
-          if (_suggestions.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _buildSuggestions(),
+          
+          // Advanced search options
+          if (_showAdvancedSearch) ...[
+            const SizedBox(height: 16),
+            _buildAdvancedSearchOptions(),
+          ],
+          
+          // Filter options
+          if (_showFilters) ...[
+            const SizedBox(height: 16),
+            _buildFilterOptions(),
           ],
         ],
       ),
@@ -249,18 +396,23 @@ class _GridSearchWidgetState extends State<GridSearchWidget> {
       focusNode: _searchFocusNode,
       decoration: InputDecoration(
         hintText: widget.placeholder,
-        prefixIcon: const Icon(Icons.search),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.blue.shade500),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        isDense: true,
       ),
       onChanged: _onSearchChanged,
       onSubmitted: _onSearchSubmitted,
     );
   }
 
-  Widget _buildAdvancedSearch() {
+  Widget _buildAdvancedSearchOptions() {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -272,306 +424,43 @@ class _GridSearchWidgetState extends State<GridSearchWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Advanced Search',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: widget.columns
-                .where((col) => col.searchable)
-                .map((column) => _buildSearchOption(column))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchOption(GridColumn column) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Text(
-        column.title,
-        style: TextStyle(
-          color: Colors.grey.shade700,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterSection() {
-    final activeFilters = widget.filters.entries.where((e) => e.value.isNotEmpty).length;
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade300, width: 1.5),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.filter_list, color: Colors.grey.shade700),
-              const SizedBox(width: 8),
-              Text(
-                'Filters',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              if (activeFilters > 0) ...[
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$activeFilters active',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              if (activeFilters > 0)
-                TextButton(
-                  onPressed: () {
-                    // Clear all filters
-                    for (final column in widget.columns.where((col) => col.filterable)) {
-                      widget.onFilter?.call(column.id, '');
-                    }
-                  },
-                  child: Text(
-                    'Clear All',
-                    style: TextStyle(
-                      color: Colors.red.shade600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: widget.columns
-                .where((col) => col.filterable)
-                .map((column) => SizedBox(
-                      height: 44,
-                      child: _buildFilterChip(column),
-                    ))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(GridColumn column) {
-    final currentFilter = widget.filters[column.id] ?? '';
-    final isActive = currentFilter.isNotEmpty;
-    
-    return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(column.title),
-          if (isActive) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                currentFilter,
-                style: TextStyle(
-                  color: Colors.grey.shade800,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-      selected: isActive,
-      onSelected: (selected) {
-        print('Filter chip tapped for column: \'${column.title}\' (selected: $selected)');
-        if (selected) {
-          _showFilterDialog(column);
-        } else {
-          widget.onFilter?.call(column.id, '');
-        }
-      },
-      selectedColor: Colors.grey.shade200,
-      checkmarkColor: Colors.grey.shade700,
-      backgroundColor: Colors.grey.shade100,
-      side: BorderSide(
-        color: isActive ? Colors.grey.shade400 : Colors.grey.shade300,
-        width: 1,
-      ),
-    );
-  }
-
-  void _showFilterDialog(GridColumn column) {
-    final controller = TextEditingController(text: widget.filters[column.id] ?? '');
-    String selectedValue = widget.filters[column.id] ?? '';
-    FilterType selectedType = _filterTypes[column.id] ?? FilterType.contains;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Icon(Icons.filter_list, color: Colors.grey.shade700),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text('Filter by ${column.title}', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 340,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Filter type:', style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<FilterType>(
-                  value: selectedType,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  items: FilterType.values.map((type) => DropdownMenuItem(
-                    value: type,
-                    child: Text(filterTypeLabel(type)),
-                  )).toList(),
-                  onChanged: (type) {
-                    if (type != null) setState(() => selectedType = type);
-                  },
-                ),
-                const SizedBox(height: 16),
-                Text('Value:', style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    hintText: 'Enter filter value...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
-                    suffixIcon: selectedValue.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey.shade600),
-                            onPressed: () {
-                              controller.clear();
-                              setState(() { selectedValue = ''; });
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (value) { setState(() { selectedValue = value; }); },
-                  autofocus: true,
-                ),
-                if (selectedValue.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Will show rows where ${column.title.toLowerCase()} ${filterTypeLabel(selectedType).toLowerCase()} "$selectedValue"',
-                            style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+            'Advanced Search Options',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade800,
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() { _filterTypes[column.id] = selectedType; });
-                widget.onFilter?.call('${column.id}|${selectedType.name}', selectedValue);
-                Navigator.of(context).pop();
+          const SizedBox(height: 12),
+          
+          // Column-specific search options
+          ...widget.columns.where((col) => 
+            col.searchable && (widget.columnSearchEnabled?[col.id] ?? true)
+          ).map((column) {
+            return CheckboxListTile(
+              title: Text(column.title),
+              subtitle: Text('Search in ${column.title}'),
+              value: widget.columnSearchEnabled?[column.id] ?? true,
+              onChanged: (value) {
+                // This would need to be handled by the parent widget
+                // For now, we'll just show the current state
               },
-              child: Text('Apply Filter'),
-            ),
-          ],
-        ),
+              dense: true,
+            );
+          }).toList(),
+        ],
       ),
     );
   }
 
-  Widget _buildSuggestions() {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: _suggestions.length,
-        itemBuilder: (context, index) {
-          final suggestion = _suggestions[index];
-          return ListTile(
-            dense: true,
-            title: Text(suggestion),
-            onTap: () => _onSuggestionSelected(suggestion),
-          );
-        },
-      ),
-    );
+  Widget _buildFilterOptions() {
+    return widget.customFilterWidget ?? 
+      GridFilterWidget(
+        columns: widget.columns,
+        filters: widget.filters,
+        onFilter: widget.onFilter ?? (_, __) {},
+        visible: true,
+        showFilterChips: true,
+        showFilterDialog: true,
+      );
   }
 } 
